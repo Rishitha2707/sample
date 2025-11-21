@@ -1,101 +1,81 @@
-# -------------------------------
+from flask import Flask, render_template, request, redirect, session
 
-# Simple ATM Application in Python
+app = Flask(__name__)
+app.secret_key = "securekey123"   # Change in production
 
-# -------------------------------
- 
-# Pre-defined user data (you can replace with database values)
-
+# User data (in-memory)
 users = {
-
     "nikki": {"pin": "1234", "balance": 5000},
-
     "admin": {"pin": "0000", "balance": 10000}
-
 }
- 
+
+
+@app.route("/", methods=["GET", "POST"])
 def login():
+    if request.method == "POST":
+        username = request.form["username"].lower()
+        pin = request.form["pin"]
 
-    print("\n--- LOGIN ---")
-
-    username = input("Enter username: ").lower()
-
-    pin = input("Enter PIN: ")
- 
-    if username in users and users[username]["pin"] == pin:
-
-        print("Login successful!\n")
-
-        return username
-
-    else:
-
-        print("Invalid username or PIN.\n")
-
-        return None
- 
-def atm_menu(username):
-
-    while True:
-
-        print(f"\n--- ATM MENU ({username.upper()}) ---")
-
-        print("1. Check Balance")
-
-        print("2. Deposit Cash")
-
-        print("3. Withdraw Cash")
-
-        print("4. Exit")
- 
-        choice = input("Select option: ")
- 
-        if choice == "1":
-
-            print(f"Your Balance: ₹{users[username]['balance']}")
- 
-        elif choice == "2":
-
-            amount = int(input("Enter amount to deposit: ₹"))
-
-            users[username]["balance"] += amount
-
-            print(f"₹{amount} deposited successfully!")
- 
-        elif choice == "3":
-
-            amount = int(input("Enter amount to withdraw: ₹"))
-
-            if amount <= users[username]["balance"]:
-
-                users[username]["balance"] -= amount
-
-                print(f"₹{amount} withdrawn successfully!")
-
-            else:
-
-                print("Insufficient balance.")
- 
-        elif choice == "4":
-
-            print("Thank you for using ATM!")
-
-            break
- 
+        if username in users and users[username]["pin"] == pin:
+            session["user"] = username
+            return redirect("/menu")
         else:
+            return render_template("login.html", error="Invalid username or PIN")
 
-            print("Invalid option! Try again.")
- 
-# Main Program
+    return render_template("login.html")
 
-print("===== WELCOME TO PYTHON ATM =====")
- 
-user = login()
 
-if user:
+@app.route("/menu")
+def menu():
+    if "user" not in session:
+        return redirect("/")
+    return render_template("menu.html", user=session["user"])
 
-    atm_menu(user)
 
-else:
+@app.route("/balance")
+def balance():
+    if "user" not in session:
+        return redirect("/")
+    user = session["user"]
+    return render_template("balance.html", balance=users[user]["balance"])
 
-    print("Exiting program...")
+
+@app.route("/deposit", methods=["GET", "POST"])
+def deposit():
+    if "user" not in session:
+        return redirect("/")
+    user = session["user"]
+
+    if request.method == "POST":
+        amount = int(request.form["amount"])
+        users[user]["balance"] += amount
+        return redirect("/balance")
+
+    return render_template("deposit.html")
+
+
+@app.route("/withdraw", methods=["GET", "POST"])
+def withdraw():
+    if "user" not in session:
+        return redirect("/")
+    user = session["user"]
+
+    if request.method == "POST":
+        amount = int(request.form["amount"])
+        if amount <= users[user]["balance"]:
+            users[user]["balance"] -= amount
+            return redirect("/balance")
+        else:
+            return render_template("withdraw.html", error="Insufficient balance")
+
+    return render_template("withdraw.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/")
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
